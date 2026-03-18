@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+    
+    <!-- Temporal Dynamics Node -->
+    
+    <arg name="use_sim_time" default="true"/>
+    <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    
+    <!-- Configuration file for all parameters -->
+    <arg name="config_file" default="$(find aion)/config/temporal_dynamics_config.yaml"/>
+    <arg name="fremen_action_server_name" default="/fremenarray_aion"/>
+    
+    <!-- Start FremenArray server first -->
+    <node pkg="fremenarray" type="fremenarray" name="fremenarray_aion" output="screen">
+        <param name="action_server_name" value="$(arg fremen_action_server_name)" />
+    </node>
+
+    <!-- Load all parameters from unified config file -->
+    <rosparam file="$(arg config_file)" command="load"/>
+    
+    <!-- Temporal Dynamics Node -->
+    <node pkg="aion" type="temporal_dynamics_node" name="temporal_dynamics_node" output="screen"/>
+        
+</launch>

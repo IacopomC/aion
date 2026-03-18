@@ -1,0 +1,151 @@
+# Aion - Unified Configuration
+# All parameters for temporal dynamics module in one place
+
+temporal_dynamics_node:
+  # Core Temporal Parameters
+  num_orientation_bins: 8                    # Number of directional bins for flow patterns
+  update_interval_seconds: 10.0              # How often to update temporal models (reduced from 600s for real-time)
+  min_observations: 1                        # Minimum observations for temporal modeling (lower for debugging)
+  detection_association_distance: 0.7        # Max distance to associate hash cells with navigational nodes
+  fremen_model_order: 0                      # Fremen temporal model complexity (0=basic)
+
+  # Layer Configuration
+  use_navigation_layer: true                 # Use layer 20 (MESH_PLACES) for 2D navigation places
+  target_layer_id: -1                       # Override layer selection (-1 = use default based on use_navigation_layer)
+
+  # Computation Control Flags
+  enable_historical_computation: true         # Compute metrics from historical data
+  enable_prediction_computation: false        # Compute metrics from Fremen predictions
+    
+  # ROS Topics Configuration
+  hydra_dsg_topic: "hydra_ros_node/backend/dsg"
+  people_detection_topic: "/people_detections"
+  temporal_places_topic: "/aion/temporal_dynamics"
+  hash_cells_topic: "/aion/hash_cells"
+  debug_bindings_topic: "/aion/debug/bindings"
+  temporal_nodes_topic: "/aion/temporal_nodes"
+  historical_nodes_topic: "/aion/historical_nodes"
+  temporal_map_topic: "/aion/temporal_map"
+  
+  # ROS Services Configuration
+  prediction_service_name: "/aion/get_prediction"
+  all_predictions_service_name: "/aion/get_all_predictions"
+  reset_service_name: "/aion/reset"
+  manual_fremen_service_name: "/aion/update_fremen"
+  export_navigation_service_name: "/aion/export_navigation_data"
+  export_temporal_map_service_name: "/aion/export_temporal_map"
+
+  # Export defaults
+  export_default_output_directory: "/tmp/aion_navigation_export"
+  export_default_filename_prefix: "aion_export"
+  
+  # Fremen Configuration
+  fremen_action_server_name: "/fremenarray_aion"
+  fremen_operation_timeout: 5.0              # Timeout for Fremen operations (seconds)
+  
+  # Timing Parameters
+  place_sync_interval_seconds: 5.0          # How often to sync places (keep reasonable)
+  min_velocity_threshold: 0.1                # Minimum velocity to consider for flow
+  processing_timer_rate: 0.5                 # Processing timer duration (seconds) - 0.5 Hz for smoother viz
+  
+  # Sparse Hash-Space Generation
+  spatial_hash_grid_size: 0.3                  # Size for artificial place discretization (meters)
+
+  # Visualization Parameters
+  marker_scale: 0.3                          # Base scale for markers
+  arrow_scale: 1.0                           # Scale for arrow markers
+  use_sphere_markers: false                   # true=spheres, false=arrows (overridden by visualization_mode)
+
+  # Visualization mode (takes precedence over use_sphere_markers):
+  #   "direction" - one arrow per place pointing in the dominant flow direction (default)
+  #   "entropy"   - one sphere per place, colored by entropy and sized by activity
+  #   "bins"      - all num_orientation_bins arrows per place, each scaled by its probability
+  visualization_mode: "bins"
+  frame_id: "map"                            # TF frame for markers
+  
+  # Temporal Visualization Scaling
+  activity_scaling_factor: 30.0              # Higher = slower sphere growth based on observations
+  confidence_scaling_factor: 30.0            # Higher = slower transparency change based on data amount
+  
+  # Z-height Filtering Parameters
+  filter_by_z_height: false                  # Enable height-based filtering
+  min_z_height: -1.0                         # Minimum Z coordinate (ground level)
+  max_z_height: 2.0                          # Maximum Z coordinate (ceiling height)
+  
+  # Performance Parameters
+  max_detections_per_callback: 50            # Limit processing load per callback
+  lightweight_mode: false                    # Disable lightweight mode by default
+  async_processing: true                     # Enable async processing by default
+  detection_buffer_size: 10                  # Max detection buffer size for real-time performance
+  use_efficient_spatial_search: true         # Use KD-tree for O(log n) nearest neighbor search vs O(n) linear
+  
+  # Stability window for delayed binding (loop closure robustness)
+  enable_delayed_binding: true                      # Enable/disable the delayed binding feature
+  stability_window_seconds: 5.0                     # Time to wait before binding dynamics to nodes [seconds] - reduced for debugging
+  enable_debug_visualization: true                # Enable/disable debug markers for hash cells and bindings
+
+  # Marker Visualization Ranges
+  marker_size_range:
+    min_multiplier: 1.0                      # Minimum size multiplier for activity scaling
+    max_multiplier: 1.5                      # Maximum size multiplier for activity scaling
+  
+  marker_transparency_range:
+    min_alpha: 0.6                           # Minimum transparency for confidence scaling
+    max_alpha: 0.9                           # Maximum transparency for confidence scaling
+  
+  arrow_length_range:
+    min_multiplier: 0.8                      # Minimum arrow length multiplier
+    max_multiplier: 1.2                      # Maximum arrow length multiplier
+  
+  # Inactive Place Visualization
+  inactive_marker_scale_factor: 0.3          # Scale factor for places without temporal data
+  inactive_marker_alpha: 0.4                 # Transparency for inactive place markers
+  inactive_marker_color:
+    r: 0.5                                   # Red component for inactive markers
+    g: 0.5                                   # Green component for inactive markers  
+    b: 0.5                                   # Blue component for inactive markers
+  
+  # Entropy Color Mapping
+  entropy_color_mapping:
+    max_entropy_for_normalization: 2.0       # Max entropy value for color normalization (8 bins)
+    predictable_color:                       # Color for low entropy (predictable)
+      r: 0.0
+      g: 0.0
+      b: 1.0                                 # Blue
+    chaotic_color:                           # Color for high entropy (chaotic)
+      r: 1.0                                 # Red
+      g: 0.0
+      b: 0.0
+  
+  # Prediction Visualization
+  prediction_markers:
+    green_tint_increase: 0.3                 # How much to increase green for predicted markers
+    transparency_reduction: 0.1              # How much to reduce alpha for predicted markers
+  
+  # Arrow Marker Dimensions
+  arrow_dimensions:
+    shaft_diameter: 0.1                      # Arrow shaft diameter
+    head_diameter: 0.2                       # Arrow head diameter
+    head_length: 0.1                         # Arrow head length
+  
+  # Standardized Z Levels
+  marker_z_levels:
+    temporal_markers: 5.0                    # Standard Z level for all temporal markers
+    inactive_markers: 5.0                    # Standard Z level for inactive place markers
+  
+  # Debug and Logging
+  throttle_intervals:
+    debug_general: 10.0                      # General debug message throttle (seconds)
+    debug_detailed: 30.0                     # Detailed debug message throttle (seconds)
+    info_statistics: 30.0                    # Statistics info message throttle (seconds)
+    warning_overflow: 5.0                    # Buffer overflow warning throttle (seconds)
+
+  # Timing & Profiling
+  enable_timing: false                       # Write per-iteration timing + memory to CSV
+  timing_output_file: ""                     # Path for timing CSV (empty = /tmp/aion_timing.csv)
+  
+  # Global Model Parameters
+  global_model:
+    min_places_for_connection: 3             # Minimum places needed before using Fremen connection
+    prediction_fallback_intensity: 0.7      # Weight for current activity in prediction visualization
+    prediction_strength_weight: 0.3         # Weight for prediction strength in visualization

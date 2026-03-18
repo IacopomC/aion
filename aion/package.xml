@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aion</name>
+  <version>1.0.0</version>
+  <description>Temporal dynamics integration for Hydra scene graphs</description>
+
+  <maintainer email="iacopomcatalano@gmail.com">Iacopo Catalano</maintainer>
+  <license>MIT</license>
+
+  <author email="iacopomcatalano@gmail.com">Iacopo Catalano</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>message_generation</buildtool_depend>
+
+  <!-- Core ROS1 dependencies -->
+  <depend>roscpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>message_generation</depend>
+
+  <!-- Hydra ecosystem -->
+  <depend>hydra_msgs</depend>
+  <depend>spark_dsg</depend>
+  
+  <!-- Fremen temporal modeling -->
+  <depend>actionlib</depend>
+  <depend>fremenarray</depend>
+  
+  <!-- System dependencies -->
+  <depend>eigen3</depend>
+
+  <exec_depend>message_runtime</exec_depend>
+
+  <export>
+  </export>
+</package>

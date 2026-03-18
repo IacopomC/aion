@@ -1,0 +1,48 @@
+The MIT License (MIT)
+
+Copyright (c) 2014 Tomas Krajnik
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+In the case that you publish work that uses the FreMEn software, please cite 
+one of the following papers:
+
+#general idea of the FreMEn approach
+@inproceedings{krajnik,
+Author={Tom{\'a}{\v s} Krajn{\'i}k and Jaime Pulido Fentanes and Grzegorz Cielniak and Christian Dondrup and Tom Duckett}
+Booktitle = {IEEE International Conference on Robotics and Automation 2014},
+Title = {Spectral Analysis for Long-Term Robotic Mapping},
+Year = {2014}
+}
+
+#localization improvement when using FreMEn
+@inproceedings{iros_2014_topol,
+Author = {Tom{\'a}{\v s} Krajn{\'\i}k and Jaime Pulido Fentanes and Oscar M. Mozos and Tom Duckett and Johan Ekekrantz and Marc Hanheide},
+Booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems '14},
+Title = {Long-Term Topological Localization for Service Robots in Dynamic Environments using Spectral Maps},
+Year = {2014}}
+
+#combination of OctoMap and FREMen
+@article{krajnikfroctomap,
+  title={FROctomap: An Efficient Spatio-Temporal Environment Representation},
+  author={Krajn{\i}k, Tom{\'a}{\v{s}} and Santos, Joao and Seemann, Bianca and Duckett, Tom},
+  journal={Advances in Autonomous Robotics Systems},
+  pages={269},
+  publisher={Springer}
+}

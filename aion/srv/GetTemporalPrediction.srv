@@ -1,0 +1,21 @@
+# Request temporal prediction for a specific place and time
+
+# Input parameters
+uint64 place_id          # Place node ID in the scene graph
+uint64 prediction_time   # Time for prediction (nanoseconds since epoch)
+float64 x                # Optional: query position x (if place_id is 0, use position)
+float64 y                # Optional: query position y  
+float64 z                # Optional: query position z
+
+---
+
+# Response with temporal prediction
+bool success                    # Whether prediction was successful
+string message                  # Status message
+uint64 place_id                 # Actual place ID used for prediction
+float64[] flow_probabilities    # Probability distribution over orientation bins
+float64 entropy                 # Entropy measure of the temporal model
+uint64 num_observations        # Total observations used in the model
+float64 position_x             # Place position x
+float64 position_y             # Place position y  
+float64 position_z             # Place position z

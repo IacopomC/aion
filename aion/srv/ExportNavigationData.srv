@@ -1,0 +1,27 @@
+# Export both Hydra navigation layer and Aion temporal dynamics for A* analysis
+# To call:
+# rosservice call /aion/export_navigation_data "
+# output_directory: '/home/iacopo/code/workspaces/aion_ws/src/aion/aion/aion_export/'
+# filename_prefix: 'demo'
+# include_connectivity: true
+# include_temporal_data: true
+# prediction_time: 0.0"
+
+# Request parameters
+string output_directory        # Directory to save exported data
+string filename_prefix        # Prefix for output files (optional)
+bool include_connectivity     # Export edge connectivity information
+bool include_temporal_data    # Export Aion temporal dynamics
+float64 prediction_time       # Time for temporal predictions (0 = current time)
+
+---
+
+# Response
+bool success                  # Operation success
+string message               # Status message
+string navigation_file       # Path to navigation layer export file  
+string temporal_file         # Path to temporal dynamics export file
+string connectivity_file     # Path to connectivity/edges export file
+int32 num_nodes             # Number of nodes exported
+int32 num_edges             # Number of edges exported
+int32 num_temporal_places   # Number of places with temporal data

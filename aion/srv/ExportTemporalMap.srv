@@ -1,0 +1,19 @@
+# Export Aion temporal map data to various formats
+
+# Grid bounds for numpy export (only used if format is "numpy")
+geometry_msgs/Point min_bounds
+geometry_msgs/Point max_bounds
+float64 grid_resolution  # Grid resolution in meters (for numpy format)
+
+# Export parameters
+string map_type    # "temporal", "historical", "all"
+string file_path   # Base path for saved files (timestamp and type will be appended)
+string format      # "json", "numpy", "csv"
+
+# Optional parameters for specific exports
+int32 prediction_time  # For temporal nodes, filter by specific prediction time (-1 for all)
+
+---
+bool success
+string message
+string[] saved_files

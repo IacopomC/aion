@@ -1,0 +1,3 @@
+[submodule "fremen_array"]
+	path = fremen_array
+	url = git@github.com:IacopomC/fremen_array.git

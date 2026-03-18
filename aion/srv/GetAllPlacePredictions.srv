@@ -1,0 +1,13 @@
+# Request temporal predictions for all places at once
+
+# Input parameters
+uint64 prediction_time   # Time for prediction (nanoseconds since epoch)
+int32 order             # Fremen model order for prediction
+
+---
+
+# Response with predictions for all places
+bool success                           # Whether prediction was successful
+string message                         # Status message
+uint64 prediction_time                 # Actual prediction time used
+aion/PlacePrediction[] place_predictions    # Array of all place predictions
