@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.14)
+project(aion_standalone LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# ── pybind11 — use the copy bundled inside spark_dsg (no network required) ──
+set(PYBIND11_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../spark_dsg/third_party/pybind11"
+    CACHE PATH "Path to pybind11 source directory")
+add_subdirectory(${PYBIND11_DIR} pybind11_build)
+
+# ── Eigen3 ──────────────────────────────────────────────────────────────────
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+# ── libfremen — added to aion_ws ────────────────────────────────────────────
+set(LIBFREMEN_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../libfremen"
+    CACHE PATH "Path to libfremen source directory")
+add_subdirectory(${LIBFREMEN_DIR} fremen_build EXCLUDE_FROM_ALL)
+
+# ── _aion_standalone module ─────────────────────────────────────────────────
+pybind11_add_module(_aion_standalone
+    bindings/aion_bindings.cpp
+    src/aion_core.cpp
+)
+target_include_directories(_aion_standalone PRIVATE src)
+target_link_libraries(_aion_standalone PRIVATE fremen_core Eigen3::Eigen)
+
+# Place the .so directly inside the Python package so import works without install
+set_target_properties(_aion_standalone PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/aion_python")
