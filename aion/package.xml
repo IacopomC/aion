@@ -23,6 +23,7 @@
   <depend>message_generation</depend>
 
   <!-- Hydra ecosystem -->
+  <depend>hydra</depend>
   <depend>hydra_msgs</depend>
   <depend>spark_dsg</depend>
   

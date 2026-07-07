@@ -1,0 +1,15 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "cmake>=3.14",
+    "ninja",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aion_python"
+version = "0.1.0"
+description = "AION standalone Python bindings (file-driven, no ROS)"
+requires-python = ">=3.8"
+dependencies = []

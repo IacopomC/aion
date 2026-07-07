@@ -28,6 +28,11 @@ pybind11_add_module(_aion_standalone
 target_include_directories(_aion_standalone PRIVATE src)
 target_link_libraries(_aion_standalone PRIVATE fremen_core Eigen3::Eigen)
 
-# Place the .so directly inside the Python package so import works without install
-set_target_properties(_aion_standalone PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/aion_python")
+# When built via `pip install` (CMakeExtension), CMAKE_LIBRARY_OUTPUT_DIRECTORY
+# is passed in from setup.py and takes precedence (drops the .so into the
+# wheel staging dir). Fall back to placing it inside the package directory
+# for manual cmake builds.
+if(NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY OR CMAKE_LIBRARY_OUTPUT_DIRECTORY STREQUAL "")
+    set_target_properties(_aion_standalone PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/aion_python")
+endif()

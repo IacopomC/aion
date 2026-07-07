@@ -8,6 +8,10 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <hydra_msgs/DsgUpdate.h>
 #include <std_srvs/Trigger.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <limits>
 #include <memory>
 #include <map>
 #include <chrono>
@@ -51,17 +55,17 @@ class TemporalDynamicsNode {
     // Number of orientation bins for flow direction
     int num_orientation_bins = 8;
     
-    // Update interval for temporal models (seconds)
-    double update_interval_seconds = 30.0;
-    
+    // Update interval for temporal models (seconds).
+    double update_interval_seconds = 10.0;
+
     // Minimum observations needed for temporal modeling
     int min_observations = 10;
-    
-    // Maximum distance to associate detections with temporal places
-    double detection_association_distance = 3.0;
-    
-    // Fremen model order (0=basic, higher=more complex)
-    int fremen_model_order = 0;
+
+    // Maximum distance to associate detections with temporal places.
+    double detection_association_distance = 0.7;
+
+    // Fremen model order (0=basic, higher=more complex).
+    int fremen_model_order = 1;
     
     // ROS topic names
     std::string hydra_dsg_topic = "hydra_ros_node/backend/dsg";
@@ -119,7 +123,12 @@ class TemporalDynamicsNode {
     double confidence_scaling_factor = 30.0;  // Higher = slower transparency change with confidence
     
     // Stable ordering for global state vector (prevents Fremen confusion when new places appear)
-    double spatial_hash_grid_size = 5.0;  // Size of spatial hash grid cells [meters]
+    double spatial_hash_grid_size = 0.4;  // spatial hash cell size (m)
+    // Drop detections farther than this (m) from the robot pose (looked up via
+    // TF: frame_id -> robot_frame). Limits the local support window.
+    // Infinity = disabled. Matches the offline AionConfig max_detection_range_m.
+    double max_detection_range_m = std::numeric_limits<double>::infinity();
+    std::string robot_frame = "base_link";  // robot body frame for the range gate
     
     // Stability window for delayed binding (loop closure robustness)
     double stability_window_seconds = 30.0;  // Time to wait before binding dynamics to nodes
@@ -607,6 +616,11 @@ class TemporalDynamicsNode {
   // Current detection buffer for processing
   std::queue<geometry_msgs::PoseArray::ConstPtr> detection_buffer_;
   std::mutex detection_mutex_;
+
+  // TF (robot pose lookup for the detection range gate). Declared together so
+  // tf_listener_ can be initialized from tf_buffer_ in the constructor.
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener tf_listener_;
     
   // Asynchronous DSG processing queue (non-blocking)
   std::queue<hydra_msgs::DsgUpdate::ConstPtr> dsg_update_queue_;

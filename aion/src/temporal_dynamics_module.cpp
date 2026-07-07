@@ -14,10 +14,16 @@
 
 namespace aion {
 
-TemporalDynamicsNode::TemporalDynamicsNode() : nh_(), pnh_("~") {
+TemporalDynamicsNode::TemporalDynamicsNode()
+    : nh_(), pnh_("~"), tf_buffer_(), tf_listener_(tf_buffer_) {
 
   // Load all parameters from unified config structure - no hardcoded values
   pnh_.param("num_orientation_bins", config_.num_orientation_bins, 8);
+  // Detection range gate (m) from the robot pose; inf = disabled. Matches the
+  // offline AionConfig max_detection_range_m so ROS and offline share the param.
+  pnh_.param("max_detection_range_m", config_.max_detection_range_m,
+             std::numeric_limits<double>::infinity());
+  pnh_.param("robot_frame", config_.robot_frame, std::string("base_link"));
   pnh_.param("update_interval_seconds", config_.update_interval_seconds, 5.0); // Reduced from 10.0 to 5.0 for faster updates
   pnh_.param("min_observations", config_.min_observations, 1);
   pnh_.param("detection_association_distance", config_.detection_association_distance, 2.0); // Conservative distance for detection-to-place association

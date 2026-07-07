@@ -3,6 +3,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/utils.h>
 #include <chrono>
+#include <cmath>
 
 namespace aion {
 
@@ -60,6 +61,23 @@ void TemporalDynamicsNode::associateDetectionsWithPlaces(
 
   const uint64_t current_time = ros::Time::now().toNSec();
 
+  // Robot pose in the map frame for the detection range gate (frame_id ->
+  // robot_frame translation). Gate is skipped if disabled or TF unavailable.
+  bool have_robot = false;
+  double robot_x = 0.0, robot_y = 0.0;
+  if (std::isfinite(config_.max_detection_range_m)) {
+    try {
+      auto tf = tf_buffer_.lookupTransform(
+          config_.frame_id, config_.robot_frame, ros::Time(0), ros::Duration(0.1));
+      robot_x = tf.transform.translation.x;
+      robot_y = tf.transform.translation.y;
+      have_robot = true;
+    } catch (const tf2::TransformException& ex) {
+      ROS_WARN_THROTTLE(5.0, "range-gate TF lookup failed (%s -> %s): %s",
+                        config_.frame_id.c_str(), config_.robot_frame.c_str(), ex.what());
+    }
+  }
+
   // Track detection processing metrics
   size_t detections_processed = 0;
   size_t detections_associated = 0;
@@ -71,6 +89,17 @@ void TemporalDynamicsNode::associateDetectionsWithPlaces(
   for (const auto& pose : detections->poses) {
     detections_processed++;
     Eigen::Vector3d detection_pos(pose.position.x, pose.position.y, pose.position.z);
+
+    // Range gate: drop detections farther than max_detection_range_m from the robot.
+    if (have_robot) {
+      const double dxr = pose.position.x - robot_x;
+      const double dyr = pose.position.y - robot_y;
+      if (dxr * dxr + dyr * dyr >
+          config_.max_detection_range_m * config_.max_detection_range_m) {
+        detections_skipped++;
+        continue;
+      }
+    }
 
     // Find the appropriate location for temporal data (either bound node or hash cell)
     spark_dsg::NodeId target_place_id = 0;

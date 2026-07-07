@@ -2,9 +2,12 @@
 #include <libfremen/fremen_model.hpp>
 #include <Eigen/Core>
 #include <array>
+#include <map>
 #include <optional>
+#include <string>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <cstdint>
 #include <cmath>
@@ -19,37 +22,52 @@ struct AionConfig {
     // and to find the nearest place at log_prob query time.
     // Matches AION detection_association_distance.
     double assoc_radius = 0.7;
-    // Spatial hash grid cell size (m). Matches AION spatial_hash_grid_size.
-    double grid_size = 0.3;
+    // Spatial hash grid cell size (m).
+    double grid_size = 0.4;
     int    fremen_order = 1;
+    // Empty → libfremen daily/weekly periods. The runner overrides this with
+    // [60, 300, 600] s (minute-scale), the correct scale for the dataset.
     std::vector<float> candidate_periods;
+    // Detection range gate: drop detections farther than this (metres) from the
+    // robot pose. Limits the local support window.
+    // Default infinity = gate disabled.
+    double max_detection_range_m = std::numeric_limits<double>::infinity();
 };
 
 // ---------------------------------------------------------------------------
 // AionCore — offline replication of TemporalDynamicsNode's algorithm.
 //
-// Storage mirrors AION's two-tier design:
+// Temporal data is anchored to STABLE spatial grid cells; a DSG node binding is
+// a transient overlay, mirroring AION's ROS temporal_place_data_ + bind/transfer
+// + handleNodeRemoval. There is ONE conceptual global FreMEn model: each grid
+// cell × orientation bin is an independent FreMEn element (FremenArray elements
+// do not couple), so per-element models are mathematically equivalent to a
+// single concatenated global array.
 //
-//   hash_cells_      Temporary accumulator for unbound positions.
-//                    Window counts only; no FreMEn model.
-//                    Keyed by grid cell of the DETECTION position.
+//   hash_cells_      Unbound places, keyed by the DETECTION position's grid cell.
+//   node_entries_    Bound places, keyed by the NODE position's grid cell
+//                    (position-based so the same physical place gets the same
+//                    key across sessions even when DSG node IDs differ).
+//   hash_bindings_   detection cell_key → node_entry_key; routes post-binding
+//                    detections straight to the node entry.
 //
-//   node_entries_    Permanent FreMEn models, created when a hash cell is first
-//                    bound to a DSG node (flushWindow).
-//                    Keyed by the grid cell of the NODE position — position-
-//                    based so the same physical place gets the same key across
-//                    sessions even when DSG node IDs differ.
-//
-//   hash_bindings_   Maps cell_key → node_entry_key so future detections at an
-//                    already-bound position bypass the hash cell and go straight
-//                    to the node entry.  Persists across session resets.
+// Each Entry stores the RAW per-window count history (t_s → counts[kNBins]) and
+// builds its FreMEn models lazily (the models are a pure function of history).
+// Storing raw counts — rather than one addObservation() per cell per window —
+// lets multiple cells merge into one node (and a node release back to a cell)
+// by summing counts at each t_s, and avoids the duplicate-timestamp loss that
+// per-observation feeding suffers when several cells bind to one node in the
+// same window.
 //
 // Flow (per time window):
-//   addDetection  →  hash cell (unbound) or node entry (already bound)
-//   flushWindow   →  try to bind unbound cells to nearest DSG node;
-//                    push normalised counts to the node entry's FreMEn model;
-//                    keep unbound cells whose counts cannot be flushed yet
-//   logProb       →  find nearest node entry within assoc_radius; query FreMEn
+//   addDetection  →  bound node entry (via hash_bindings_) or hash cell
+//   flushWindow   →  1. commit each entry's current window into its history
+//                    2. releaseRemovedNodes(): move vanished bound nodes back
+//                       to hash space (merge by t_s)
+//                    3. bind unbound hash cells to the nearest live node
+//                       (merge by t_s), record the binding, erase the cell
+//   logProb       →  nearest entry (either map) with history within assoc_radius;
+//                    build its models lazily; predict.
 // ---------------------------------------------------------------------------
 class AionCore {
 public:
@@ -63,54 +81,76 @@ public:
 
     // Accumulate one pedestrian detection into the appropriate hash cell or
     // node entry (whichever the position has been bound to).
-    void addDetection(int64_t t_ns, double x, double y, double theta);
+    // robot_x/robot_y: world-frame robot position used for the range gate. When
+    // the detection is farther than config.max_detection_range_m from the robot
+    // it is dropped. Defaults (0,0) + infinite range == no gating.
+    void addDetection(int64_t t_ns, double x, double y, double theta,
+                      double robot_x = 0.0, double robot_y = 0.0);
 
-    // End-of-window step:
-    //   1. Flush node entries that have accumulated counts → FreMEn.
-    //   2. Try to bind each unbound hash cell to the nearest DSG node:
-    //        - If a node is found: create/update the node entry, push the
-    //          accumulated counts, record the binding, clear the hash cell.
-    //        - If no node is found: retain counts for the next window
-    //          (same behaviour as AION for detections in unmapped areas).
+    // End-of-window step: commit windows → history, release vanished nodes back
+    // to hash space, then bind unbound hash cells to the nearest DSG node.
     void flushWindow(int64_t window_end_ns);
 
-    // Predict log P(bin(theta) | nearest_node_entry, t).
-    // Returns NaN if no trained node entry is within assoc_radius.
+    // Predict log P(bin(theta) | nearest place, t).
+    // Returns NaN if no place with history is within assoc_radius.
     double logProb(int64_t t_ns, double x, double y, double theta) const;
+
+    // Heading log-DENSITY log p(theta) for the channel-wise MLPD table. Aion is
+    // heading-only, so this is its only density channel (speed/joint are "--").
+    // Converts the per-bin probability mass P(bin) to a density over [0, 2pi):
+    // p(theta) = P(bin) * kNBins / (2pi), i.e. logProb + log(kNBins/(2pi)).
+    // NaN if no trained cell within assoc_radius.
+    double logProbHeading(int64_t t_ns, double x, double y, double theta) const;
+
+    // Full per-bin heading distribution at the query point and time: the
+    // normalized bin masses P(bin | nearest entry, t) in bin index order.
+    // Empty if no trained entry lies within assoc_radius. One entry lookup
+    // and one model build serve every bin, so callers that need the whole
+    // distribution should prefer this over kNBins single-bin queries.
+    std::vector<double> headingDistribution(int64_t t_ns, double x, double y) const;
+
+    // Bin index for a heading: the same mapping used to accumulate and score.
+    int thetaToBin(double theta) const;
 
     void reset();
 
     std::size_t numHashCells()    const { return hash_cells_.size(); }
     std::size_t numNodeEntries()  const { return node_entries_.size(); }
-    // Entries with at least one FreMEn observation (all node entries qualify
-    // once they have been flushed at least once).
-    std::size_t numTrainedEntries() const { return node_entries_.size(); }
+    std::size_t numTrainedEntries() const;
+
+    // ── Multi-session state I/O ──────────────────────────────────────────────
+    // Custom binary format (magic "AION" + version). Stores the raw per-window
+    // count history of every entry; FreMEn models are rebuilt lazily on first
+    // query, so the format is independent of libfremen's serialization.
+    // grid_size + n_bins must match on load. hash_bindings_ is not persisted
+    // (next flushWindow re-binds to the new DSG run's places).
+    bool saveState(const std::string& path,
+                   std::string* error = nullptr) const;
+    bool loadState(const std::string& path,
+                   std::string* error = nullptr);
 
 private:
-    // Temporary accumulator — no FreMEn model.
-    struct HashCell {
+    // Unified spatial place entry — anchors raw temporal history + lazy models.
+    struct Entry {
         int64_t ix = 0, iy = 0;
+        Eigen::Vector3d pos = Eigen::Vector3d::Zero();
         std::array<int, kNBins> window_counts{};
         int window_total = 0;
-    };
-
-    // Permanent FreMEn store — one per physical place.
-    struct NodeEntry {
-        Eigen::Vector3d pos;                                    // node position
-        std::array<libfremen::FremenCellModel, kNBins> models;
-        std::array<int, kNBins> window_counts{};
-        int window_total = 0;
-        bool has_data = false;  // true after first FreMEn observation
+        // Committed per-window raw counts (t_s seconds → counts per bin).
+        std::vector<std::pair<uint32_t, std::array<int, kNBins>>> history;
+        // FreMEn models, lazily (re)built from history; mutable so const logProb
+        // can build on demand. models_built is cleared whenever history changes.
+        mutable std::array<libfremen::FremenCellModel, kNBins> models;
+        mutable bool models_built = false;
+        bool hasData() const { return !history.empty(); }
     };
 
     AionConfig config_;
 
-    // Current DSG nodes (replaced by updateNodePositions after each frame).
-    std::unordered_map<uint64_t, Eigen::Vector3d> nodes_cache_;
-
-    std::unordered_map<size_t, HashCell>   hash_cells_;    // cell_key → cell
-    std::unordered_map<size_t, NodeEntry>  node_entries_;  // node_key → entry
-    std::unordered_map<size_t, size_t>     hash_bindings_; // cell_key → node_key
+    std::unordered_map<uint64_t, Eigen::Vector3d> nodes_cache_;  // current DSG nodes
+    std::unordered_map<size_t, Entry> hash_cells_;     // unbound, keyed by detection cell
+    std::unordered_map<size_t, Entry> node_entries_;   // bound, keyed by node cell
+    std::unordered_map<size_t, size_t> hash_bindings_; // detection cell_key → node_key
 
     std::vector<float> periods_;
 
@@ -119,16 +159,18 @@ private:
     void            cellIndices(double x, double y, int64_t& ix, int64_t& iy) const;
     std::pair<double,double> cellCenter(int64_t ix, int64_t iy) const;
 
-    // Find nearest DSG node to (cx, cy) within assoc_radius; return its
-    // position-based grid key, or nullopt.
+    // Nearest live DSG node to (cx, cy) within assoc_radius → (node cell key, pos).
     std::optional<std::pair<size_t, Eigen::Vector3d>>
         findNearestNode(double cx, double cy) const;
 
-    // Find nearest node entry with has_data==true to (x, y) within assoc_radius.
-    std::optional<size_t> findNearestNodeEntry(double x, double y) const;
+    // Nearest entry (either map) with history within assoc_radius, or nullptr.
+    const Entry* findNearestEntry(double x, double y) const;
 
-    void initModels(NodeEntry& ne) const;
-    int  thetaToBin(double theta) const;
+    void initModels(std::array<libfremen::FremenCellModel, kNBins>& models) const;
+    void buildModels(const Entry& e) const;
+    void commitWindow(Entry& e, uint32_t t_s) const;
+    void mergeInto(Entry& dst, const Entry& src) const;
+    void releaseRemovedNodes();
 };
 
 }  // namespace aion

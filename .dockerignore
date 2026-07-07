@@ -1,0 +1,8 @@
+.git
+**/build
+**/devel
+**/install
+**/__pycache__
+**/*.pyc
+**/_skbuild
+**/*.egg-info

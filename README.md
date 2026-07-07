@@ -27,6 +27,11 @@ This repository is the official implementation of the paper:
 | **[Usage Examples](doc/usage-examples.md)** | Service calls, export tools, and A\* planning |
 | **[Understanding Aion](doc/understanding-aion.md)** | Concepts, architecture, and theory |
 | **[Visualization Guide](doc/temporal_markers_guide.md)** | Marker encoding and RViz setup |
+| **[Benchmark suite](https://github.com/IacopomC/aion_benchmark)** | Standalone repo: evaluation scripts and flow-aware routing |
+
+The evaluation and routing scripts live in a separate repository,
+[`aion_benchmark`](https://github.com/IacopomC/aion_benchmark) — clone it
+alongside this repo to reproduce the paper analysis or run the routing evaluation.
 
 ## Installation
 
@@ -57,6 +62,17 @@ cd ~/aion_ws && catkin build
 source devel/setup.bash
 ```
 
+> **GTSAM / TBB note (required for loop-closure / LCD-on runs).** The packaged GTSAM is built
+> **with TBB** (`GTSAM_USE_TBB`). Its parallel multifrontal elimination races on the dense
+> deformation-graph structure produced under many loop closures and crashes nondeterministically
+> (`map::at` / segfault inside `OptimizeClique`). Fix: serialize that solve by adding, at the top
+> of `kimera_rpgo/src/RobustSolver.cpp::optimize()`,
+> `tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 1);` (plus
+> `#include <tbb/global_control.h>`). Zero measurable cost (the solve is a few ms). **The Docker
+> build applies this automatically** (`docker/Dockerfile` patches the pinned Kimera-RPGO clone);
+> for a native build, apply it by hand — Kimera-RPGO is upstream MIT-SPARK, so it's a local patch.
+> NB: `TBB_NUM_THREADS=1` does **not** work; only `tbb::global_control` constrains GTSAM's arena.
+
 ## Quick Start
 
 ```bash
@@ -85,6 +101,56 @@ The launch file starts both the FremenArray action server and the Aion temporal 
 | `/aion/export_navigation_data` | Service | Export graph + temporal data to JSON |
 
 **Visualization**: Markers are colored by entropy (blue = predictable, red = chaotic), sized by activity level, and opacity encodes confidence. In `"bins"` mode, all 8 direction bins are shown as individual scaled arrows per place.
+
+## Python (no-ROS) Workflow
+
+In addition to the ROS-based real-time node, Aion ships a **file-driven Python workflow** that runs offline against pre-recorded scenes (works on any `FileDataLoader`-format scene).
+
+The Python workflow has **no ROS dependency** and it embeds the FreMEn solver (`libfremen`) directly in-process, drives Hydra through its own Python
+bindings, and persists state to disk via a `--save-flow-state` / `--load-flow-state` flag pair so consecutive sessions accumulate as if the robot had explored continuously.
+
+### Build
+
+```bash
+# Build workspace
+catkin init
+catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release
+catkin build
+source devel/setup.bash
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip # upgrade for pip 25
+
+# 1. Install spark_dsg from the local copy FIRST
+pip install -e src/spark_dsg
+
+# 2. Install hydra
+pip install -e src/hydra
+
+# 3. Install aion bindings
+pip install -e src/aion/aion/python
+```
+
+### Run
+
+```bash
+# Train
+python -m aion_python.runner \
+  --config <dataset> --labelspace ade20k_outdoor \
+  --train-scenes /path/to/scene_1 /path/to/scene_1\
+  --train-csvs   /path/to/scene_1/tracks.csv /path/to/scene_2/tracks.csv\
+  --save-flow-state results/aion_state.bin \
+  --output-graph results/dsg.json \
+  --assoc-radius 0.7 --grid-size 0.4 --time-window 10.0 --order 1
+
+# Test/Score
+python -m aion_python.score \
+  --flow-state results/aion_state.bin \
+  --test-csvs  /path/to/test/tracks_1.csv /path/to/test/tracks_2.csv \
+  --output     results/preds_aion.csv
+```
 
 ## Quick Configuration
 

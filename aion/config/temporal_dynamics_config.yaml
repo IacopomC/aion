@@ -7,7 +7,8 @@ temporal_dynamics_node:
   update_interval_seconds: 10.0              # How often to update temporal models (reduced from 600s for real-time)
   min_observations: 1                        # Minimum observations for temporal modeling (lower for debugging)
   detection_association_distance: 0.7        # Max distance to associate hash cells with navigational nodes
-  fremen_model_order: 0                      # Fremen temporal model complexity (0=basic)
+  fremen_model_order: 1                      # FreMEn model order (1 = first harmonic; 0 = mean-only)
+  candidate_periods: [60.0, 300.0, 600.0]    # FreMEn candidate periods (s); read by the offline binding (the external fremenarray node has its own period config)
 
   # Layer Configuration
   use_navigation_layer: true                 # Use layer 20 (MESH_PLACES) for 2D navigation places
@@ -49,7 +50,11 @@ temporal_dynamics_node:
   processing_timer_rate: 0.5                 # Processing timer duration (seconds) - 0.5 Hz for smoother viz
   
   # Sparse Hash-Space Generation
-  spatial_hash_grid_size: 0.3                  # Size for artificial place discretization (meters)
+  spatial_hash_grid_size: 0.4                  # spatial hash cell size (m)
+  max_detection_range_m: 5.0                   # Drop detections farther than this (m) from the
+                                               # robot pose. Limits the local support window.
+                                               # Set to .inf to disable the gate.
+  robot_frame: "base_link"                     # ROS-only: robot body frame; gate looks up frame_id->robot_frame via TF.
 
   # Visualization Parameters
   marker_scale: 0.3                          # Base scale for markers
